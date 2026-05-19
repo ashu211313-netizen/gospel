@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ラッカゴスペル 一人回しシミュレーター v7.2</title>
+    <title>ラッカゴスペル 一人回しシミュレーター v8.0</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -13,6 +13,7 @@
             --text-muted: #94a3b8;
             --accent: #3b82f6;
             --border-color: #475569;
+            --drag-over-color: #3b82f6;
         }
 
         body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 10px; user-select: none; }
@@ -27,11 +28,16 @@
         button.reset { background-color: #ef4444; }
 
         .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 10px; }
-        .zone { background-color: var(--zone-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; min-height: 120px; position: relative; }
-        .zone-title { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); margin-bottom: 6px; border-bottom: 1px solid #444; padding-bottom: 3px; display: flex; justify-content: space-between; }
+        
+        /* ゾーン共通スタイル */
+        .zone { background-color: var(--zone-bg); border: 2px solid var(--border-color); border-radius: 6px; padding: 8px; min-height: 120px; position: relative; transition: background-color 0.2s, border-color 0.2s; }
+        /* ドラッグ中のホバー効果 */
+        .zone.drag-over { border-color: var(--drag-over-color); background-color: #1d4ed833; }
+        
+        .zone-title { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); margin-bottom: 6px; border-bottom: 1px solid #444; padding-bottom: 3px; display: flex; justify-content: space-between; pointer-events: none; }
 
         .bottom-row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
-        .card-list { display: flex; flex-wrap: wrap; gap: 6px; }
+        .card-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 100px; }
 
         .card {
             background-color: #000;
@@ -41,21 +47,21 @@
             height: 140px;
             position: relative;
             box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-            cursor: pointer;
+            cursor: grab;
             transition: transform 0.2s, border-color 0.2s;
             overflow: hidden;
+            touch-action: none; /* スマホのスクロールと干渉させない */
         }
+        .card:active { cursor: grabbing; }
         .card:hover { border-color: var(--accent); z-index: 5; }
 
         .card-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 
-        /* タップ状態 */
+        /* タップ状態（横向き） */
         .card.tapped { transform: rotate(90deg); border-color: #fbbf24; margin: 0 15px; }
 
-        .card-actions { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.85); display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; opacity: 0; transition: opacity 0.2s; }
-        .card:hover .card-actions { opacity: 1; }
-        .action-btn { background: #333; color: white; border: none; font-size: 0.5rem; padding: 4px 0; cursor: pointer; font-weight: bold; }
-        .action-btn:hover { background: var(--accent); }
+        /* ドラッグ中のダミースタイル */
+        .card.dragging { opacity: 0.4; border-style: dashed; }
 
         .card.facedown { background: #450a0a; transform: none !important; }
         .card.facedown .card-img { display: none; }
@@ -84,19 +90,19 @@
     </div>
 
     <div class="board">
-        <div class="zone" id="shield-zone">
-            <div class="zone-title"><span>シールドゾーン</span><span id="count-shield">0</span></div>
+        <div class="zone" id="shield" data-zone="shield">
+            <div class="zone-title"><span>シールドゾーン（ここにドラッグでシールド化）</span><span id="count-shield">0</span></div>
             <div class="card-list" id="list-shield"></div>
         </div>
-        <div class="zone" id="battle-zone">
-            <div class="zone-title"><span>バトルゾーン (タップでアタック/能力起動)</span><span id="count-battle">0</span></div>
+        <div class="zone" id="battle" data-zone="battle">
+            <div class="zone-title"><span>バトルゾーン（クリックでタップ/アンタップ）</span><span id="count-battle">0</span></div>
             <div class="card-list" id="list-battle"></div>
         </div>
-        <div class="zone" id="mana-zone">
-            <div class="zone-title"><span>マナゾーン (タップでコスト支払い)</span><span id="count-mana">0</span></div>
+        <div class="zone" id="mana" data-zone="mana">
+            <div class="zone-title"><span>マナゾーン</span><span id="count-mana">0</span></div>
             <div class="card-list" id="list-mana"></div>
         </div>
-        <div class="zone" id="graveyard-zone">
+        <div class="zone" id="graveyard" data-zone="graveyard">
             <div class="zone-title"><span>墓地 (呪文カウント: <span id="spell-count" style="color:#ef4444">0</span>枚)</span><span id="count-graveyard">0</span></div>
             <div class="card-list" id="list-graveyard"></div>
         </div>
@@ -108,8 +114,8 @@
             <div class="deck-count" id="count-deck">40</div>
             <div style="text-align: center; font-size: 0.6rem; color: var(--text-muted);">クリックでドロー</div>
         </div>
-        <div class="zone" id="hand-zone">
-            <div class="zone-title"><span>手札 (クリックでカードを使う)</span><span id="count-hand">0</span></div>
+        <div class="zone" id="hand" data-zone="hand">
+            <div class="zone-title"><span>手札 (ダブルクリック/長押しで効果発動)</span><span id="count-hand">0</span></div>
             <div class="card-list" id="list-hand"></div>
         </div>
     </div>
@@ -130,7 +136,7 @@
             "kirimomi": "キリモミ.jpg",
             "gate": "ロスト.jpg",
             "coldflame": "コルフレ.jpg",
-            "finger": "バニフィン.jpg", // ← ここを「バニフィン.jpg」に修正したじょ！
+            "finger": "バニフィン.jpg",
             "roaring": "ヴリドガルド.jpg",
             "concerto": "セイリーン.jpg",
             "maniacs": "マニアクス.jpg",
@@ -160,12 +166,15 @@
 
         let state = { deck: [], hand: [], shield: [], mana: [], battle: [], graveyard: [], turn: 1, extraTurns: 0, hasChargedMana: false };
         let cardUid = 0;
+        let draggedCardInfo = null; // ドラッグ中カードの一時保持用
 
         function initGame() {
             state = { deck: [], hand: [], shield: [], mana: [], battle: [], graveyard: [], turn: 1, extraTurns: 0, hasChargedMana: false };
             cardUid = 0;
             masterCards.forEach(mc => {
-                for(let i=0; i<mc.count; i++) state.deck.push({...mc, uid: cardUid++, img: cardFileMap[mc.id], tapped: false, facedown: false});
+                for(let i=0; i<mc.count; i++) {
+                    state.deck.push({...mc, uid: cardUid++, img: cardFileMap[mc.id], tapped: false, facedown: false});
+                }
             });
             shuffle(state.deck);
             for(let i=0; i<5; i++) { let c = state.deck.pop(); c.facedown = true; state.shield.push(c); }
@@ -186,25 +195,125 @@
             render();
         }
 
+        // カード移動コアロジック
         function moveCard(uid, from, to) {
-            if(from === 'hand' && to === 'mana') { if(state.hasChargedMana){ alert("マナチャージは1ターンに1回までだじょ！"); return; } state.hasChargedMana = true; }
+            if (from === to) return;
+            if (from === 'hand' && to === 'mana') { 
+                if (state.hasChargedMana) { 
+                    alert("マナチャージは1ターンに1回までだじょ！"); 
+                    return; 
+                } 
+                state.hasChargedMana = true; 
+            }
             let idx = state[from].findIndex(c => c.uid === uid);
-            if(idx !== -1) {
+            if (idx !== -1) {
                 let c = state[from].splice(idx, 1)[0];
                 c.facedown = (to === 'shield');
-                if(to === 'mana' && c.multi) c.tapped = true; else if(to !== 'battle') c.tapped = false;
+                if (to === 'mana' && c.multi) c.tapped = true; else if (to !== 'battle') c.tapped = false;
                 state[to].push(c);
-                if(to === 'battle' && c.id === 'gospel') executeGospel();
+                if (to === 'battle' && c.id === 'gospel') executeGospel();
                 render();
             }
         }
 
+        // --- ドラッグ＆ドロップ用イベント処理（PC & スマホ対応） ---
+        function setupDragAndDrop(element, uid, fromZone) {
+            // PCブラウザ標準のドラッグ設定
+            element.draggable = true;
+            
+            element.addEventListener('dragstart', (e) => {
+                draggedCardInfo = { uid: uid, from: fromZone };
+                element.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', uid);
+            });
+
+            element.addEventListener('dragend', () => {
+                element.classList.remove('dragging');
+            });
+
+            // スマホ等タッチデバイス用の擬似ドラッグ（PointerEvent）
+            let isPointerDragging = false;
+            let startX, startY;
+            let clone = null;
+
+            element.addEventListener('pointerdown', (e) => {
+                if(e.target.classList.contains('action-btn')) return;
+                // バトル/マナゾーンのカードはクリックでタップさせるので、手札・シールド・墓地のみドラッグ開始を遅延
+                isPointerDragging = false;
+                startX = e.clientX;
+                startY = e.clientY;
+                draggedCardInfo = { uid: uid, from: fromZone };
+                element.setPointerCapture(e.pointerId);
+            });
+
+            element.addEventListener('pointermove', (e) => {
+                if (draggedCardInfo && (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10)) {
+                    if (!isPointerDragging) {
+                        isPointerDragging = true;
+                        element.classList.add('dragging');
+                    }
+                }
+            });
+
+            element.addEventListener('pointerup', (e) => {
+                element.releasePointerCapture(e.pointerId);
+                if (!isPointerDragging) {
+                    // 通常クリック時の挙動
+                    if (fromZone === 'battle' || fromZone === 'mana') {
+                        let c = state[fromZone].find(x => x.uid === uid);
+                        if (c) { c.tapped = !c.tapped; render(); }
+                    } else if (fromZone === 'shield') {
+                        if (confirm("このシールドを手札に加えますか？")) moveCard(uid, fromZone, 'hand');
+                    } else if (fromZone === 'hand') {
+                        openModal(uid, fromZone); // 手札はクリックで効果表示
+                    }
+                } else {
+                    // ドロップ先の判定
+                    element.classList.remove('dragging');
+                    let targetEl = document.elementFromPoint(e.clientX, e.clientY);
+                    let zoneEl = targetEl ? targetEl.closest('.zone') : null;
+                    if (zoneEl) {
+                        let toZone = zoneEl.getAttribute('data-zone');
+                        if (toZone) moveCard(draggedCardInfo.uid, draggedCardInfo.from, toZone);
+                    }
+                }
+                isPointerDragging = false;
+                draggedCardInfo = null;
+            });
+        }
+
+        // ゾーン側のイベント設定（PCドラッグ用）
+        document.querySelectorAll('.zone').forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('drag-over');
+            });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                if (draggedCardInfo) {
+                    let toZone = zone.getAttribute('data-zone');
+                    if (toZone) moveCard(draggedCardInfo.uid, draggedCardInfo.from, toZone);
+                    draggedCardInfo = null;
+                }
+            });
+        });
+
+        // 効果ウィンドウ
         function openModal(uid, zone) {
             let c = state[zone].find(x => x.uid === uid);
             if(!c || c.facedown) return;
-            if(zone === 'mana' || zone === 'battle') { c.tapped = !c.tapped; render(); return; }
             
             document.getElementById('modal-card-img').src = c.img;
+            // 画像読み込みエラーが起きた時のためのスペア処理
+            document.getElementById('modal-card-img').onerror = function() {
+                // 大文字小文字の拡張子違い対策（.JPGなど）
+                if(this.src.endsWith('.jpg')) this.src = this.src.replace('.jpg', '.JPG');
+            };
+
             const acts = document.getElementById('modal-actions'); acts.innerHTML = '';
             
             if(c.id === 'ttt') {
@@ -212,7 +321,7 @@
                 createBtn(acts, "効果使う: シンパシー/SA付与（墓地送り）", () => { discard(c.uid, zone); });
             } else if(c.id === 'lyrmis') {
                 createBtn(acts, "ガ・リュミーズ発動: 追加ターン獲得", () => { state.extraTurns++; discard(c.uid, zone); });
-            } else if(c.id === 'love' && zone === 'hand') {
+            } else if(c.id === 'love') {
                 createBtn(acts, "呪文側唱える: 3ドロー", () => { drawCard(); drawCard(); drawCard(); discard(c.uid, zone); });
             } else if(c.id === 'roaring') {
                 createBtn(acts, "効果使う: 1捨て2引き", () => { drawCard(); drawCard(); discard(c.uid, zone); });
@@ -220,7 +329,7 @@
             } else if(c.id === 'coldflame' || c.id === 'finger') {
                 createBtn(acts, "効果使う: 1枚捨てて2枚引く", () => { drawCard(); drawCard(); discard(c.uid, zone); });
             } else {
-                createBtn(acts, "唱える / 墓地へ置く", () => discard(c.uid, zone));
+                createBtn(acts, "カードを墓地に置く（使う）", () => discard(c.uid, zone));
             }
             
             document.getElementById('effect-modal').style.display = 'block';
@@ -247,12 +356,11 @@
                 document.getElementById(`count-${z}`).innerText = state[z].length;
                 state[z].forEach(c => {
                     let div = document.createElement('div'); div.className = `card ${c.facedown?'facedown':''} ${c.tapped?'tapped':''}`;
-                    div.innerHTML = `<img class="card-img" src="${c.img}"><div class="card-actions">` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','hand')">手札</button>` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','mana')">マナ</button>` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','battle')">バトル</button>` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','graveyard')">墓地</button></div>`;
-                    if(c.facedown) div.onclick = (e) => { e.stopPropagation(); if(confirm("このシールドを手札に加えますか？")) moveCard(c.uid, z, 'hand'); }; else div.onclick = () => openModal(c.uid, z);
+                    div.innerHTML = `<img class="card-img" src="${c.img}" onerror="if(this.src.endsWith('.jpg'))this.src=this.src.replace('.jpg','.JPG');">`;
+                    
+                    // 各カードにドラッグイベントを紐付け
+                    setupDragAndDrop(div, c.uid, z);
+                    
                     el.appendChild(div);
                 });
             });
