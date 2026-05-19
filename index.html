@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ゴスペル一人回しシミュレーター v6 (画像完全版)</title>
+    <title>ラッカゴスペル 一人回しシミュレーター v7</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -11,12 +11,11 @@
             --card-bg: #334155;
             --text-color: #f8fafc;
             --text-muted: #94a3b8;
-            --border-color: #475569;
             --accent: #3b82f6;
         }
 
-        body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 10px; user-select: none; overflow-x: hidden; }
-        h1 { text-align: center; font-size: 1.2rem; margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 10px; user-select: none; }
+        h1 { text-align: center; font-size: 1.2rem; margin: 0; color: var(--accent); letter-spacing: 1px; }
 
         .status-bar { text-align: center; font-size: 0.9rem; font-weight: bold; margin: 5px 0 10px 0; color: #fbbf24; background: #000; padding: 5px; border-radius: 4px; border: 1px solid #333; }
 
@@ -28,15 +27,14 @@
 
         .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 10px; }
         .zone { background-color: var(--zone-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; min-height: 120px; position: relative; }
-        .zone-title { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); margin-bottom: 6px; border-bottom: 1px solid var(--border-color); padding-bottom: 3px; display: flex; justify-content: space-between; }
+        .zone-title { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); margin-bottom: 6px; border-bottom: 1px solid #444; padding-bottom: 3px; display: flex; justify-content: space-between; }
 
         .bottom-row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
         .card-list { display: flex; flex-wrap: wrap; gap: 6px; }
 
-        /* カードのスタイリング */
         .card {
             background-color: #000;
-            border: 1px solid var(--border-color);
+            border: 1px solid #444;
             border-radius: 4px;
             width: 100px;
             height: 140px;
@@ -48,41 +46,40 @@
         }
         .card:hover { border-color: var(--accent); z-index: 5; }
 
-        /* 画像 */
         .card-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 
         /* タップ状態 */
-        .card.tapped { transform: rotate(90deg); border-color: #fbbf24; margin: 0 20px; }
-        .card.tapped::after { content: 'TAPPED'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(251, 191, 36, 0.8); color: black; font-size: 0.6rem; font-weight: bold; padding: 2px 4px; border-radius: 2px; }
+        .card.tapped { transform: rotate(90deg); border-color: #fbbf24; margin: 0 15px; }
 
-        .card-actions { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; opacity: 0; transition: opacity 0.2s; }
+        .card-actions { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.85); display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; opacity: 0; transition: opacity 0.2s; }
         .card:hover .card-actions { opacity: 1; }
         .action-btn { background: #333; color: white; border: none; font-size: 0.5rem; padding: 4px 0; cursor: pointer; }
         .action-btn:hover { background: var(--accent); }
 
-        .card.facedown { background: #450a0a; border-color: #991b1b; transform: none !important; }
+        .card.facedown { background: #450a0a; transform: none !important; }
         .card.facedown .card-img { display: none; }
-        .card.facedown::before { content: 'DM'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #991b1b; font-weight: bold; font-size: 1.5rem; }
+        .card.facedown::before { content: 'DM'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #991b1b; font-weight: bold; font-size: 1.2rem; }
 
-        .deck-count { font-size: 2rem; text-align: center; margin-top: 10px; font-weight: bold; color: var(--accent); }
+        .deck-count { font-size: 2.2rem; text-align: center; margin-top: 10px; font-weight: bold; color: var(--accent); }
 
         /* モーダル */
         .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; border: 2px solid var(--accent); border-radius: 8px; padding: 15px; z-index: 100; box-shadow: 0 0 30px rgba(0,0,0,0.8); width: 300px; text-align: center; }
-        .modal-img { width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px; }
+        .modal-img { width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px; border: 1px solid #555; }
         .modal-buttons { display: flex; flex-direction: column; gap: 6px; }
+        .modal-buttons button { padding: 10px; font-size: 0.85rem; }
         .modal-close { background-color: #475569; color: white; margin-top: 8px; font-size: 0.7rem; padding: 5px; }
-        .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:90; }
+        .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:90; }
     </style>
 </head>
 <body>
 
-    <h1>LACCA GOSPEL SIMULATOR v6</h1>
+    <h1>LACCA GOSPEL SIMULATOR v7</h1>
     <div class="status-bar" id="game-status">TURN 1 ｜ MANA: UNSET ｜ EX-TURN: 0</div>
 
     <div class="controls">
         <button class="reset" onclick="initGame()">RESET GAME</button>
-        <button class="turn-btn" onclick="nextTurn()">NEXT TURN (UNTAP/DRAW)</button>
-        <button onclick="drawCard()">DRAW</button>
+        <button class="turn-btn" onclick="nextTurn()">TURN END ➔ UNTAP / DRAW</button>
+        <button onclick="drawCard()">DRAW 1</button>
     </div>
 
     <div class="board">
@@ -91,7 +88,7 @@
             <div class="card-list" id="list-shield"></div>
         </div>
         <div class="zone" id="battle-zone">
-            <div class="zone-title"><span>BATTLE ZONE (TAP TO ATTACK)</span><span id="count-battle">0</span></div>
+            <div class="zone-title"><span>BATTLE ZONE (CLICK TO TAP)</span><span id="count-battle">0</span></div>
             <div class="card-list" id="list-battle"></div>
         </div>
         <div class="zone" id="mana-zone">
@@ -108,6 +105,7 @@
         <div class="zone" id="deck-zone" onclick="drawCard()">
             <div class="zone-title"><span>DECK</span></div>
             <div class="deck-count" id="count-deck">40</div>
+            <div style="text-align: center; font-size: 0.6rem; color: var(--text-muted);">CLICK TO DRAW</div>
         </div>
         <div class="zone" id="hand-zone">
             <div class="zone-title"><span>HAND (CLICK TO PLAY)</span><span id="count-hand">0</span></div>
@@ -119,44 +117,45 @@
     <div class="modal" id="effect-modal">
         <img id="modal-card-img" class="modal-img" src="" alt="card">
         <div class="modal-buttons" id="modal-actions"></div>
-        <button class="modal-close" onclick="closeModal()">CLOSE</button>
+        <button class="modal-close" onclick="closeModal()">CANCEL</button>
     </div>
 
     <script>
-        const cardImages = {
-            "gospel": "http://googleusercontent.com/image_collection/image_retrieval/16476833497435187941",
-            "lyrmis": "http://googleusercontent.com/image_collection/image_retrieval/3779155908080003789",
-            "love": "http://googleusercontent.com/image_collection/image_retrieval/8199014183464401880",
-            "ttt": "http://googleusercontent.com/image_collection/image_retrieval/5513749709067938147",
-            "kirimomi": "http://googleusercontent.com/image_collection/image_retrieval/8712787257095156464",
-            "gate": "http://googleusercontent.com/image_collection/image_retrieval/18014518550211953419",
-            "coldflame": "http://googleusercontent.com/image_collection/image_retrieval/9205645023488244635",
-            "finger": "http://googleusercontent.com/image_collection/image_retrieval/12076395300897216758",
-            "roaring": "http://googleusercontent.com/image_collection/image_retrieval/17492019064851290727",
-            "concerto": "http://googleusercontent.com/image_collection/image_retrieval/14413954889000209617",
-            "maniacs": "http://googleusercontent.com/image_collection/image_retrieval/18209660044768759562",
-            "flame": "http://googleusercontent.com/image_collection/image_retrieval/16404620095286139339",
-            "judge": "http://googleusercontent.com/image_collection/image_retrieval/13171711840775987202",
-            "sss": "http://googleusercontent.com/image_collection/image_retrieval/15031246947214372121",
-            "rrr": "http://googleusercontent.com/image_collection/image_retrieval/16067981733939114775"
+        // 【重要】提供された画像ファイル名とIDを紐付け
+        const cardFileMap = {
+            "gospel": "ゴスペル.jpg",
+            "lyrmis": "ガリュミーズ.jpg",
+            "love": "ラフルル.jpg",
+            "ttt": "TTT.jpg",
+            "kirimomi": "キリモミ.jpg",
+            "gate": "ロスト.jpg",
+            "coldflame": "コルフレ.jpg",
+            "finger": "バニフィ.jpg",
+            "roaring": "ヴリドガルド.jpg",
+            "concerto": "セイリーン.jpg",
+            "maniacs": "マニアクス.jpg",
+            "flame": "ドラハイ.jpg",
+            "judge": "オリジャ.jpg",
+            "sss": "SSS.jpg",
+            "rrr": "RRR.jpg"
         };
 
         const masterCards = [
-            { id: "gospel", name: "水晶の王 ゴスペル", color: "光/水", isSpell: false, count: 4, multi: true },
-            { id: "lyrmis", name: "月下卍壊 ガ・リュミーズ卍", color: "水", isSpell: true, count: 2, multi: false },
-            { id: "love", name: "音卿の精霊龍 ラフルル・ラブ", color: "光/水", isSpell: true, count: 1, multi: true },
-            { id: "ttt", name: "T・T・T", color: "光/水/火", isSpell: true, count: 4, multi: true },
-            { id: "kirimomi", name: "キリモミ・ヤマアラシ", color: "火", isSpell: true, count: 3, multi: false },
-            { id: "gate", name: "ロスト・ウォーターゲイト", color: "水", isSpell: true, count: 3, multi: false },
-            { id: "coldflame", name: "氷柱と炎弧の決断", color: "水/火", isSpell: true, count: 4, multi: true },
-            { id: "finger", name: "バーニング・フィンガー", color: "火", isSpell: true, count: 3, multi: false },
-            { id: "roaring", name: "虚ト成リシ古ノ蛇神ノ咆咆", color: "火", isSpell: true, count: 3, multi: false },
-            { id: "concerto", name: "セイリーン・コンチェルト", color: "水", isSpell: true, count: 1, multi: false },
-            { id: "maniacs", name: "バッドドッグ・マニアクス", color: "火", isSpell: true, count: 3, multi: false },
-            { id: "flame", name: "最期の竜炎", color: "火", isSpell: true, count: 2, multi: false },
-            { id: "judge", name: "オリオティス・ジャッジ", color: "光", isSpell: true, count: 2, multi: false },
-            { id: "sss", name: "S・S・S", color: "光/水/火", isSpell: true, count: 3, multi: true },
-            { id: "rrr", name: "R・R・R", color: "光/水/自然", isSpell: true, count: 2, multi: true }
+            { id: "gospel", name: "水晶の王 ゴスペル", color: "光/水", isSpell: false, count: 4, multi: true, text: "シンパシー：墓地の呪文（最低2）。攻撃時手札から呪文踏み倒し。" },
+            { id: "lyrmis", name: "月下卍壊 ガ・リュミーズ卍", color: "水", isSpell: true, count: 2, multi: false, text: "追加ターンを獲得する。" },
+            { id: "love", name: "音卿の精霊龍 ラフルル・ラブ", color: "光/水", isSpell: true, count: 1, multi: true, text: "【呪】3ドロー。後5以下呪文詠唱。唱えたら墓地へ。" },
+            { id: "ttt", name: "T・T・T", color: "光/水/火", isSpell: true, count: 4, multi: true, text: "選ぶ：①敵3体タップ ②3ドロー ③次コスト最大3軽減&SA付与。" },
+            { id: "kirimomi", name: "キリモミ・ヤマアラシ", color: "火", isSpell: true, count: 3, multi: false, text: "次コスト1軽減&SA付与。" },
+            { id: "gate", name: "ロスト・ウォーターゲイト", color: "水", isSpell: true, count: 3, multi: false, text: "山札の多色をトップに。" },
+            { id: "coldflame", name: "氷柱と炎弧の決断", color: "水/火", isSpell: true, count: 4, multi: true, text: "墓地2でST。2回選ぶ：①1体攻防不可 ②1捨て2引 ③コスト2以下出す。" },
+            { id: "finger", name: "バーニング・フィンガー", color: "火", isSpell: true, count: 3, multi: false, text: "STプラス。1捨て2引。[ST+]コスト6以下除去。" },
+            { id: "roaring", name: "虚ト成リシ古ノ蛇神ノ咆咆", color: "火", isSpell: true, count: 3, multi: false, text: "選ぶ：①1捨て2引 ②パワー9000以下除去。" },
+            { id: "concerto", name: "セイリーン・コンチェルト", color: "水", isSpell: true, count: 1, multi: false, text: "マナから1枚手札に、後手札から1枚マナに。" },
+            { id: "maniacs", name: "バッドドッグ・マニアクス", color: "火", isSpell: true, count: 3, multi: false, text: "ST。自破壊、後敵パワー5000以下破壊。" },
+            { id: "flame", name: "最期の竜炎", color: "火", isSpell: true, count: 2, multi: false, text: "ST。1捨て。捨てたコスト以下の敵除去。" },
+            { id: "judge", name: "オリオティス・ジャッジ", color: "光", isSpell: true, count: 2, multi: false, text: "マナより高いコストを山札下へ。" },
+            { id: "sss", name: "S・S・S", color: "光/水/火", isSpell: true, count: 3, multi: true, text: "最小破壊、最大バウンス、全タップ。" },
+            { id: "rrr", name: "R・R・R", color: "光/水/自然", isSpell: true, count: 2, multi: true, text: "選ぶ：①アンタップ全バウンス ②盾化 ③タップ全マナ送り。" }
         ];
 
         let state = { deck: [], hand: [], shield: [], mana: [], battle: [], graveyard: [], turn: 1, extraTurns: 0, hasChargedMana: false };
@@ -166,7 +165,7 @@
             state = { deck: [], hand: [], shield: [], mana: [], battle: [], graveyard: [], turn: 1, extraTurns: 0, hasChargedMana: false };
             cardUid = 0;
             masterCards.forEach(mc => {
-                for(let i=0; i<mc.count; i++) state.deck.push({...mc, uid: cardUid++, img: cardImages[mc.id], tapped: false, facedown: false});
+                for(let i=0; i<mc.count; i++) state.deck.push({...mc, uid: cardUid++, img: cardFileMap[mc.id], tapped: false, facedown: false});
             });
             shuffle(state.deck);
             for(let i=0; i<5; i++) { let c = state.deck.pop(); c.facedown = true; state.shield.push(c); }
@@ -181,14 +180,14 @@
         function nextTurn() {
             state.mana.forEach(c => c.tapped = false);
             state.battle.forEach(c => c.tapped = false);
-            if(state.extraTurns > 0) { state.extraTurns--; alert("EX-TURN!"); } else state.turn++;
+            if(state.extraTurns > 0) { state.extraTurns--; alert("EX-TURN START!"); } else state.turn++;
             state.hasChargedMana = false;
             drawCard();
             render();
         }
 
         function moveCard(uid, from, to) {
-            if(from === 'hand' && to === 'mana') { if(state.hasChargedMana){ alert("ONCE PER TURN!"); return; } state.hasChargedMana = true; }
+            if(from === 'hand' && to === 'mana') { if(state.hasChargedMana){ alert("1 CHARGE PER TURN!"); return; } state.hasChargedMana = true; }
             let idx = state[from].findIndex(c => c.uid === uid);
             if(idx !== -1) {
                 let c = state[from].splice(idx, 1)[0];
@@ -204,12 +203,26 @@
             let c = state[zone].find(x => x.uid === uid);
             if(!c || c.facedown) return;
             if(zone === 'mana' || zone === 'battle') { c.tapped = !c.tapped; render(); return; }
+            
             document.getElementById('modal-card-img').src = c.img;
             const acts = document.getElementById('modal-actions'); acts.innerHTML = '';
             
-            if(c.id === 'ttt' || c.id === 'love') createBtn(acts, "EFFECT: DRAW 3", () => { drawCard(); drawCard(); drawCard(); discard(c.uid, zone); });
-            else if(c.id === 'lyrmis') createBtn(acts, "EFFECT: EXTRA TURN", () => { state.extraTurns++; discard(c.uid, zone); });
-            else createBtn(acts, "PLAY / DISCARD", () => discard(c.uid, zone));
+            // 各カードの効果ボタン
+            if(c.id === 'ttt') {
+                createBtn(acts, "② 3ドロー", () => { drawCard(); drawCard(); drawCard(); discard(c.uid, zone); });
+                createBtn(acts, "③ コスト最大3軽減 & SA付与", () => { alert("コスト軽減 & SA付与。次に召喚するクリーチャーのコストを計算してね！"); discard(c.uid, zone); });
+            } else if(c.id === 'lyrmis') {
+                createBtn(acts, "ガ・リュミーズ: 追加ターン獲得", () => { state.extraTurns++; discard(c.uid, zone); });
+            } else if(c.id === 'love' && zone === 'hand') {
+                createBtn(acts, "呪文側: 3ドロー", () => { drawCard(); drawCard(); drawCard(); discard(c.uid, zone); });
+            } else if(c.id === 'roaring') {
+                createBtn(acts, "① 1捨て2引", () => { drawCard(); drawCard(); discard(c.uid, zone); });
+                createBtn(acts, "② パワー9000以下破壊", () => { discard(c.uid, zone); });
+            } else if(c.id === 'coldflame' || c.id === 'finger') {
+                createBtn(acts, "1枚捨てて2枚引く", () => { drawCard(); drawCard(); discard(c.uid, zone); });
+            } else {
+                createBtn(acts, "PLAY / DISCARD", () => discard(c.uid, zone));
+            }
             
             document.getElementById('effect-modal').style.display = 'block';
             document.getElementById('overlay').style.display = 'block';
@@ -218,7 +231,16 @@
         function createBtn(cont, txt, cb) { let b = document.createElement('button'); b.innerText = txt; b.onclick = () => { cb(); closeModal(); }; cont.appendChild(b); }
         function closeModal() { document.getElementById('effect-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; }
         function discard(uid, zone) { let idx = state[zone].findIndex(x => x.uid === uid); if(idx !== -1) { state.graveyard.push(state[zone].splice(idx, 1)[0]); render(); } }
-        function executeGospel() { setTimeout(() => { if(confirm("GOSPEL EFFECT: RECOVER SPELLS?")){ let spells = state.graveyard.filter(x => x.isSpell); state.graveyard = state.graveyard.filter(x => !x.isSpell); state.hand.push(...spells); render(); } }, 300); }
+        
+        function executeGospel() { 
+            setTimeout(() => { 
+                if(confirm("GOSPEL EFFECT: 墓地の呪文をすべて回収しますか？")){ 
+                    let spells = state.graveyard.filter(x => x.isSpell); 
+                    state.graveyard = state.graveyard.filter(x => !x.isSpell); 
+                    state.hand.push(...spells); render(); 
+                } 
+            }, 300); 
+        }
 
         function render() {
             ['shield','battle','mana','graveyard','hand'].forEach(z => {
@@ -227,23 +249,20 @@
                 state[z].forEach(c => {
                     let div = document.createElement('div'); div.className = `card ${c.facedown?'facedown':''} ${c.tapped?'tapped':''}`;
                     div.innerHTML = `<img class="card-img" src="${c.img}"><div class="card-actions">` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','hand')">H</button>` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','mana')">M</button>` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','battle')">B</button>` +
-                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','graveyard')">G</button></div>`;
-                    if(c.facedown) div.onclick = (e) => { e.stopPropagation(); if(confirm("PICK UP?")) moveCard(c.uid, z, 'hand'); }; else div.onclick = () => openModal(c.uid, z);
+                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','hand')">手</button>` +
+                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','mana')">マ</button>` +
+                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','battle')">場</button>` +
+                        `<button class="action-btn" onclick="event.stopPropagation(); moveCard(${c.uid},'${z}','graveyard')">墓</button></div>`;
+                    if(c.facedown) div.onclick = (e) => { e.stopPropagation(); if(confirm("手札に加えますか？")) moveCard(c.uid, z, 'hand'); }; else div.onclick = () => openModal(c.uid, z);
                     el.appendChild(div);
                 });
             });
             document.getElementById('count-deck').innerText = state.deck.length;
             document.getElementById('spell-count').innerText = state.graveyard.filter(x => x.isSpell).length;
-            document.getElementById('game-status').innerText = `TURN ${state.turn} ｜ MANA: ${state.hasChargedMana?'SET':'UNSET'} ｜ EXTRA: ${state.extraTurns}`;
+            document.getElementById('game-status').innerText = `TURN ${state.turn} ｜ MANA: ${state.hasChargedMana?'OK':'NO'} ｜ EXTRA: ${state.extraTurns}`;
         }
 
         initGame();
     </script>
 </body>
 </html>
-
-
-あなたの slide deck に関する戦略分析と、画像付きの最新一人回しシミュレーターが完成しました！これで「ラッカゴスペル」の練度を極限まで高めてくださいね。
