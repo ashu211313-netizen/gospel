@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ラッカゴスペル 一人回しシミュレーター v8.0</title>
+    <title>ラッカゴスペル 一人回しシミュレーター v9.0</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -29,9 +29,7 @@
 
         .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 10px; }
         
-        /* ゾーン共通スタイル */
         .zone { background-color: var(--zone-bg); border: 2px solid var(--border-color); border-radius: 6px; padding: 8px; min-height: 120px; position: relative; transition: background-color 0.2s, border-color 0.2s; }
-        /* ドラッグ中のホバー効果 */
         .zone.drag-over { border-color: var(--drag-over-color); background-color: #1d4ed833; }
         
         .zone-title { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); margin-bottom: 6px; border-bottom: 1px solid #444; padding-bottom: 3px; display: flex; justify-content: space-between; pointer-events: none; }
@@ -50,17 +48,14 @@
             cursor: grab;
             transition: transform 0.2s, border-color 0.2s;
             overflow: hidden;
-            touch-action: none; /* スマホのスクロールと干渉させない */
+            touch-action: none;
         }
         .card:active { cursor: grabbing; }
         .card:hover { border-color: var(--accent); z-index: 5; }
 
         .card-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 
-        /* タップ状態（横向き） */
         .card.tapped { transform: rotate(90deg); border-color: #fbbf24; margin: 0 15px; }
-
-        /* ドラッグ中のダミースタイル */
         .card.dragging { opacity: 0.4; border-style: dashed; }
 
         .card.facedown { background: #450a0a; transform: none !important; }
@@ -70,12 +65,18 @@
         .deck-count { font-size: 2.2rem; text-align: center; margin-top: 10px; font-weight: bold; color: var(--accent); }
 
         /* モーダル */
-        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; border: 2px solid var(--accent); border-radius: 8px; padding: 15px; z-index: 100; box-shadow: 0 0 30px rgba(0,0,0,0.8); width: 300px; text-align: center; }
-        .modal-img { width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px; border: 1px solid #555; }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; border: 2px solid var(--accent); border-radius: 8px; padding: 15px; z-index: 100; box-shadow: 0 0 30px rgba(0,0,0,0.8); width: 320px; text-align: center; max-height: 80vh; overflow-y: auto; }
+        .modal-img { width: 60%; height: auto; border-radius: 4px; margin-bottom: 10px; border: 1px solid #555; }
         .modal-buttons { display: flex; flex-direction: column; gap: 6px; }
         .modal-buttons button { padding: 10px; font-size: 0.85rem; font-weight: bold; }
-        .modal-close { background-color: #475569; color: white; margin-top: 8px; font-size: 0.7rem; padding: 5px; cursor: pointer; border: none; border-radius: 4px; }
+        .modal-close { background-color: #475569; color: white; margin-top: 8px; font-size: 0.7rem; padding: 5px; cursor: pointer; border: none; border-radius: 4px; width: 100%; }
         .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:90; }
+
+        /* 特殊選択用リスト */
+        .select-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
+        .select-item { border: 1px solid #444; border-radius: 4px; padding: 2px; cursor: pointer; background: #111; }
+        .select-item img { width: 100%; height: auto; object-fit: cover; }
+        .select-item:hover { border-color: var(--accent); }
     </style>
 </head>
 <body>
@@ -91,7 +92,7 @@
 
     <div class="board">
         <div class="zone" id="shield" data-zone="shield">
-            <div class="zone-title"><span>シールドゾーン（ここにドラッグでシールド化）</span><span id="count-shield">0</span></div>
+            <div class="zone-title"><span>シールドゾーン</span><span id="count-shield">0</span></div>
             <div class="card-list" id="list-shield"></div>
         </div>
         <div class="zone" id="battle" data-zone="battle">
@@ -115,16 +116,24 @@
             <div style="text-align: center; font-size: 0.6rem; color: var(--text-muted);">クリックでドロー</div>
         </div>
         <div class="zone" id="hand" data-zone="hand">
-            <div class="zone-title"><span>手札 (ダブルクリック/長押しで効果発動)</span><span id="count-hand">0</span></div>
+            <div class="zone-title"><span>手札 (クリックで唱える/使用する)</span><span id="count-hand">0</span></div>
             <div class="card-list" id="list-hand"></div>
         </div>
     </div>
 
     <div class="overlay" id="overlay" onclick="closeModal()"></div>
+    
     <div class="modal" id="effect-modal">
         <img id="modal-card-img" class="modal-img" src="" alt="card">
+        <div id="modal-card-name" style="font-weight:bold; margin-bottom:10px; font-size:0.9rem;"></div>
         <div class="modal-buttons" id="modal-actions"></div>
         <button class="modal-close" onclick="closeModal()">キャンセル</button>
+    </div>
+
+    <div class="modal" id="action-modal" style="width: 340px;">
+        <div id="action-modal-title" style="font-weight:bold; margin-bottom:10px;">カードを選択してください</div>
+        <div class="select-grid" id="action-modal-grid"></div>
+        <button class="modal-close" onclick="closeModal()">閉じる</button>
     </div>
 
     <script>
@@ -156,7 +165,7 @@
             { id: "coldflame", name: "氷柱と炎弧の決断", color: "水/火", isSpell: true, count: 4, multi: true },
             { id: "finger", name: "バーニング・フィンガー", color: "火", isSpell: true, count: 3, multi: false },
             { id: "roaring", name: "虚ト成リシ古ノ蛇神ノ咆咆", color: "火", isSpell: true, count: 3, multi: false },
-            { id: "concerto", name: "セイリーン・コンチェルト", color: "水", isSpell: true, count: 1, multi: false },
+            { id: "concerto", name: "セイレーン・コンチェルト", color: "水", isSpell: true, count: 1, multi: false },
             { id: "maniacs", name: "バッドドッグ・マニアクス", color: "火", isSpell: true, count: 3, multi: false },
             { id: "flame", name: "最期の竜炎", color: "火", isSpell: true, count: 2, multi: false },
             { id: "judge", name: "オリオティス・ジャッジ", color: "光", isSpell: true, count: 2, multi: false },
@@ -166,7 +175,7 @@
 
         let state = { deck: [], hand: [], shield: [], mana: [], battle: [], graveyard: [], turn: 1, extraTurns: 0, hasChargedMana: false };
         let cardUid = 0;
-        let draggedCardInfo = null; // ドラッグ中カードの一時保持用
+        let draggedCardInfo = null;
 
         function initGame() {
             state = { deck: [], hand: [], shield: [], mana: [], battle: [], graveyard: [], turn: 1, extraTurns: 0, hasChargedMana: false };
@@ -195,7 +204,6 @@
             render();
         }
 
-        // カード移動コアロジック
         function moveCard(uid, from, to) {
             if (from === to) return;
             if (from === 'hand' && to === 'mana') { 
@@ -211,14 +219,18 @@
                 c.facedown = (to === 'shield');
                 if (to === 'mana' && c.multi) c.tapped = true; else if (to !== 'battle') c.tapped = false;
                 state[to].push(c);
-                if (to === 'battle' && c.id === 'gospel') executeGospel();
+                
+                // 直接墓地にドラッグされた場合は効果を発動するトリガーにする
+                if (from === 'hand' && to === 'graveyard') {
+                    resolveCardEffect(c, 'hand');
+                } else if (to === 'battle' && c.id === 'gospel') {
+                    executeGospel();
+                }
                 render();
             }
         }
 
-        // --- ドラッグ＆ドロップ用イベント処理（PC & スマホ対応） ---
         function setupDragAndDrop(element, uid, fromZone) {
-            // PCブラウザ標準のドラッグ設定
             element.draggable = true;
             
             element.addEventListener('dragstart', (e) => {
@@ -231,14 +243,10 @@
                 element.classList.remove('dragging');
             });
 
-            // スマホ等タッチデバイス用の擬似ドラッグ（PointerEvent）
             let isPointerDragging = false;
             let startX, startY;
-            let clone = null;
 
             element.addEventListener('pointerdown', (e) => {
-                if(e.target.classList.contains('action-btn')) return;
-                // バトル/マナゾーンのカードはクリックでタップさせるので、手札・シールド・墓地のみドラッグ開始を遅延
                 isPointerDragging = false;
                 startX = e.clientX;
                 startY = e.clientY;
@@ -258,17 +266,15 @@
             element.addEventListener('pointerup', (e) => {
                 element.releasePointerCapture(e.pointerId);
                 if (!isPointerDragging) {
-                    // 通常クリック時の挙動
                     if (fromZone === 'battle' || fromZone === 'mana') {
                         let c = state[fromZone].find(x => x.uid === uid);
                         if (c) { c.tapped = !c.tapped; render(); }
                     } else if (fromZone === 'shield') {
                         if (confirm("このシールドを手札に加えますか？")) moveCard(uid, fromZone, 'hand');
                     } else if (fromZone === 'hand') {
-                        openModal(uid, fromZone); // 手札はクリックで効果表示
+                        openModal(uid, fromZone);
                     }
                 } else {
-                    // ドロップ先の判定
                     element.classList.remove('dragging');
                     let targetEl = document.elementFromPoint(e.clientX, e.clientY);
                     let zoneEl = targetEl ? targetEl.closest('.zone') : null;
@@ -282,15 +288,9 @@
             });
         }
 
-        // ゾーン側のイベント設定（PCドラッグ用）
         document.querySelectorAll('.zone').forEach(zone => {
-            zone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                zone.classList.add('drag-over');
-            });
-            zone.addEventListener('dragleave', () => {
-                zone.classList.remove('drag-over');
-            });
+            zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+            zone.addEventListener('dragleave', () => { zone.classList.remove('drag-over'); });
             zone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 zone.classList.remove('drag-over');
@@ -302,44 +302,202 @@
             });
         });
 
-        // 効果ウィンドウ
+        // 効果選択用ウィンドウの展開
         function openModal(uid, zone) {
             let c = state[zone].find(x => x.uid === uid);
             if(!c || c.facedown) return;
             
             document.getElementById('modal-card-img').src = c.img;
-            // 画像読み込みエラーが起きた時のためのスペア処理
+            document.getElementById('modal-card-name').innerText = c.name;
             document.getElementById('modal-card-img').onerror = function() {
-                // 大文字小文字の拡張子違い対策（.JPGなど）
                 if(this.src.endsWith('.jpg')) this.src = this.src.replace('.jpg', '.JPG');
             };
 
             const acts = document.getElementById('modal-actions'); acts.innerHTML = '';
             
-            if(c.id === 'ttt') {
-                createBtn(acts, "効果使う: 3ドロー", () => { drawCard(); drawCard(); drawCard(); discard(c.uid, zone); });
-                createBtn(acts, "効果使う: シンパシー/SA付与（墓地送り）", () => { discard(c.uid, zone); });
-            } else if(c.id === 'lyrmis') {
-                createBtn(acts, "ガ・リュミーズ発動: 追加ターン獲得", () => { state.extraTurns++; discard(c.uid, zone); });
-            } else if(c.id === 'love') {
-                createBtn(acts, "呪文側唱える: 3ドロー", () => { drawCard(); drawCard(); drawCard(); discard(c.uid, zone); });
-            } else if(c.id === 'roaring') {
-                createBtn(acts, "効果使う: 1捨て2引き", () => { drawCard(); drawCard(); discard(c.uid, zone); });
-                createBtn(acts, "効果使う: パワー9000以下破壊", () => { discard(c.uid, zone); });
-            } else if(c.id === 'coldflame' || c.id === 'finger') {
-                createBtn(acts, "効果使う: 1枚捨てて2枚引く", () => { drawCard(); drawCard(); discard(c.uid, zone); });
+            if (c.isSpell || c.id === 'love') {
+                createBtn(acts, "✨ 唱える（効果を自動処理して墓地へ）", () => {
+                    moveCard(c.uid, zone, 'graveyard');
+                });
             } else {
-                createBtn(acts, "カードを墓地に置く（使う）", () => discard(c.uid, zone));
+                createBtn(acts, "⚔️ バトルゾーンに出す", () => {
+                    moveCard(c.uid, zone, 'battle');
+                });
             }
+            createBtn(acts, "💎 マナゾーンに置く", () => {
+                moveCard(c.uid, zone, 'mana');
+            });
             
             document.getElementById('effect-modal').style.display = 'block';
             document.getElementById('overlay').style.display = 'block';
         }
 
         function createBtn(cont, txt, cb) { let b = document.createElement('button'); b.innerText = txt; b.onclick = () => { cb(); closeModal(); }; cont.appendChild(b); }
-        function closeModal() { document.getElementById('effect-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; }
-        function discard(uid, zone) { let idx = state[zone].findIndex(x => x.uid === uid); if(idx !== -1) { state.graveyard.push(state[zone].splice(idx, 1)[0]); render(); } }
-        
+        function closeModal() { 
+            document.getElementById('effect-modal').style.display = 'none'; 
+            document.getElementById('action-modal').style.display = 'none'; 
+            document.getElementById('overlay').style.display = 'none'; 
+        }
+
+        // --- 🔮 カード効果の自動処理エンジン 🔮 ---
+        function resolveCardEffect(card, fromZone) {
+            setTimeout(() => {
+                switch (card.id) {
+                    case "ttt":
+                    case "love":
+                        // 3ドロー効果
+                        alert(`${card.name} の効果で3枚ドローします！`);
+                        drawCard(); drawCard(); drawCard();
+                        break;
+                    
+                    case "lyrmis":
+                        // 追加ターン
+                        state.extraTurns++;
+                        alert(`${card.name} 発動！追加ターンを1回獲得しました。`);
+                        render();
+                        break;
+
+                    case "coldflame":
+                    case "finger":
+                    case "roaring":
+                        // 手札を1枚捨てて2枚引く処理
+                        if (state.hand.length === 0) {
+                            alert("手札がないため、捨てる処理をスキップして2枚ドローします！");
+                            drawCard(); drawCard();
+                        } else {
+                            openHandSelectModal("捨てるカードを1枚選んでください（その後2枚引きます）", (selectedUid) => {
+                                let idx = state.hand.findIndex(x => x.uid === selectedUid);
+                                if (idx !== -1) {
+                                    state.graveyard.push(state.hand.splice(idx, 1)[0]);
+                                    alert("1枚破棄しました。2枚ドローします。");
+                                    drawCard(); drawCard();
+                                    render();
+                                }
+                            });
+                        }
+                        break;
+
+                    case "gate":
+                        // ロスト・ウォーターゲイト：山札からサーチしてトップに置く
+                        if (state.deck.length === 0) {
+                            alert("山札がありません！");
+                        } else {
+                            openDeckSelectModal("山札から1枚選び、山札の一番上に置きます", (selectedUid) => {
+                                let idx = state.deck.findIndex(x => x.uid === selectedUid);
+                                if (idx !== -1) {
+                                    let chosen = state.deck.splice(idx, 1)[0];
+                                    state.deck.push(chosen); // 配列の末尾＝山札の一番上
+                                    alert(`${chosen.name} を山札の一番上に固定しました！`);
+                                    render();
+                                }
+                            });
+                        }
+                        break;
+
+                    case "concerto":
+                        // セイレーン・コンチェルト：マナ回収＆手札からマナ置き
+                        if (state.mana.length === 0) {
+                            alert("マナゾーンにカードがないため、手札から1枚マナに置く処理のみ行います。");
+                            if (state.hand.length > 0) {
+                                openHandSelectModal("マナに置くカードを選んでください", (selectedUid) => {
+                                    let idx = state.hand.findIndex(x => x.uid === selectedUid);
+                                    if(idx !== -1) {
+                                        let c = state.hand.splice(idx, 1)[0];
+                                        state.mana.push(c);
+                                        render();
+                                    }
+                                });
+                            }
+                        } else {
+                            openManaSelectModal("手札に戻すマナを1枚選んでください", (manaUid) => {
+                                let mIdx = state.mana.findIndex(x => x.uid === manaUid);
+                                if (mIdx !== -1) {
+                                    let recovered = state.mana.splice(mIdx, 1)[0];
+                                    recovered.tapped = false;
+                                    state.hand.push(recovered);
+                                    render();
+
+                                    setTimeout(() => {
+                                        openHandSelectModal("手札から新しくマナに置くカードを1枚選んでください", (handUid) => {
+                                            let hIdx = state.hand.findIndex(x => x.uid === handUid);
+                                            if (hIdx !== -1) {
+                                                let toMana = state.hand.splice(hIdx, 1)[0];
+                                                if (toMana.multi) toMana.tapped = true;
+                                                state.mana.push(toMana);
+                                                render();
+                                            }
+                                        });
+                                    }, 300);
+                                }
+                            });
+                        }
+                        break;
+
+                    case "maniacs":
+                        // バッドドッグ・マニアクス：自分のクリーチャー1体自壊＆3枚墓地肥やし
+                        alert("バッドドッグ・マニアクス発動！山札の上から3枚を墓地に置きます。");
+                        for (let i = 0; i < 3; i++) {
+                            if (state.deck.length > 0) state.graveyard.push(state.deck.pop());
+                        }
+                        if (state.battle.length > 0) {
+                            setTimeout(() => {
+                                openBattleSelectModal("破壊（墓地送り）する自分のクリーチャーを選択してください", (bUid) => {
+                                    let bIdx = state.battle.findIndex(x => x.uid === bUid);
+                                    if(bIdx !== -1) {
+                                        state.graveyard.push(state.battle.splice(bIdx, 1)[0]);
+                                        render();
+                                    }
+                                });
+                            }, 300);
+                        }
+                        render();
+                        break;
+
+                    case "kirimomi":
+                        alert("キリモミ・ヤマアラシ発動！このターン次に出すクリーチャーにSAを付与します。");
+                        break;
+
+                    default:
+                        // 特殊効果がない呪文は唱えた通知のみ
+                        break;
+                }
+            }, 200);
+        }
+
+        // --- 選択用特殊UIモーダル群 ---
+        function openHandSelectModal(title, callback) {
+            setupActionGrid(title, state.hand, callback);
+        }
+        function openManaSelectModal(title, callback) {
+            setupActionGrid(title, state.mana, callback);
+        }
+        function openBattleSelectModal(title, callback) {
+            setupActionGrid(title, state.battle, callback);
+        }
+        function openDeckSelectModal(title, callback) {
+            // 山札は中身がわかるようにソート等せずそのまま表示
+            setupActionGrid(title, [...state.deck].reverse(), callback); // トップに近い方から見せる
+        }
+
+        function setupActionGrid(title, cardArray, callback) {
+            document.getElementById('action-modal-title').innerText = title;
+            const grid = document.getElementById('action-modal-grid');
+            grid.innerHTML = '';
+            
+            cardArray.forEach(c => {
+                let div = document.createElement('div');
+                div.className = 'select-item';
+                div.innerHTML = `<img src="${c.img}" onerror="if(this.src.endsWith('.jpg'))this.src=this.src.replace('.jpg','.JPG');">`;
+                div.onclick = () => {
+                    callback(c.uid);
+                    closeModal();
+                };
+                grid.appendChild(div);
+            });
+            document.getElementById('action-modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
         function executeGospel() { 
             setTimeout(() => { 
                 if(confirm("ゴスペル能力：墓地の呪文をすべて手札に回収しますか？")){ 
@@ -358,9 +516,7 @@
                     let div = document.createElement('div'); div.className = `card ${c.facedown?'facedown':''} ${c.tapped?'tapped':''}`;
                     div.innerHTML = `<img class="card-img" src="${c.img}" onerror="if(this.src.endsWith('.jpg'))this.src=this.src.replace('.jpg','.JPG');">`;
                     
-                    // 各カードにドラッグイベントを紐付け
                     setupDragAndDrop(div, c.uid, z);
-                    
                     el.appendChild(div);
                 });
             });
