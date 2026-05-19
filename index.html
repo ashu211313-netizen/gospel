@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ラッカゴスペル 一人回しシミュレーター v9.0</title>
+    <title>ラッカゴスペル 一人回しシミュレーター v10.0</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -19,13 +19,17 @@
         body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 10px; user-select: none; }
         h1 { text-align: center; font-size: 1.2rem; margin: 0; color: var(--accent); letter-spacing: 1px; }
 
-        .status-bar { text-align: center; font-size: 0.9rem; font-weight: bold; margin: 5px 0 10px 0; color: #fbbf24; background: #000; padding: 5px; border-radius: 4px; border: 1px solid #333; }
+        .status-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 5px 0 10px 0; }
+        .status-bar { text-align: center; font-size: 0.9rem; font-weight: bold; color: #fbbf24; background: #000; padding: 6px; border-radius: 4px; border: 1px solid #333; display: flex; align-items: center; justify-content: center; }
+        .log-bar { text-align: center; font-size: 0.85rem; font-weight: bold; color: #10b981; background: #000; padding: 6px; border-radius: 4px; border: 1px solid #333; min-height: 20px; display: flex; align-items: center; justify-content: center; transition: color 0.3s; }
 
         .controls { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         button { background-color: var(--accent); color: #fff; border: none; padding: 6px 12px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
         button:hover { filter: brightness(1.2); }
         button.turn-btn { background-color: #10b981; }
         button.reset { background-color: #ef4444; }
+        button.action-yes { background-color: #10b981; padding: 12px; font-size: 1rem; }
+        button.action-no { background-color: #ef4444; padding: 12px; font-size: 1rem; }
 
         .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 10px; }
         
@@ -82,7 +86,10 @@
 <body>
 
     <h1>ラッカゴスペル 一人回しシミュレーター</h1>
-    <div class="status-bar" id="game-status">ターン 1 ｜ マナセット：未完了 ｜ 追加ターン：0</div>
+    <div class="status-container">
+        <div class="status-bar" id="game-status">ターン 1 ｜ マナセット：未完了 ｜ 追加ターン：0</div>
+        <div class="log-bar" id="log-status">ゲーム開始！対戦よろしくおねがいしますじょ</div>
+    </div>
 
     <div class="controls">
         <button class="reset" onclick="initGame()">最初からやり直す</button>
@@ -177,6 +184,13 @@
         let cardUid = 0;
         let draggedCardInfo = null;
 
+        // ログメッセージ表示用（ブラウザーのalert全滅作戦）
+        function printLog(msg, isAlert = false) {
+            const logEl = document.getElementById('log-status');
+            logEl.innerText = msg;
+            logEl.style.color = isAlert ? "#ef4444" : "#10b981";
+        }
+
         function initGame() {
             state = { deck: [], hand: [], shield: [], mana: [], battle: [], graveyard: [], turn: 1, extraTurns: 0, hasChargedMana: false };
             cardUid = 0;
@@ -188,17 +202,32 @@
             shuffle(state.deck);
             for(let i=0; i<5; i++) { let c = state.deck.pop(); c.facedown = true; state.shield.push(c); }
             for(let i=0; i<5; i++) state.hand.push(state.deck.pop());
+            printLog("シミュレーターをリセットしましたじょ！");
             render();
         }
 
         function shuffle(a) { for(let i=a.length-1; i>0; i--){ let j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
 
-        function drawCard() { if(state.deck.length>0){ state.hand.push(state.deck.pop()); render(); } else alert("山札がなくなりました！（アウト）"); }
+        function drawCard() { 
+            if(state.deck.length > 0){ 
+                state.hand.push(state.deck.pop()); 
+                printLog("山札から1枚ドローしました。");
+                render(); 
+            } else {
+                printLog("山札がなくなりました！（ライブラリアウト）", true);
+            }
+        }
 
         function nextTurn() {
             state.mana.forEach(c => c.tapped = false);
             state.battle.forEach(c => c.tapped = false);
-            if(state.extraTurns > 0) { state.extraTurns--; alert("追加ターンを開始します！"); } else state.turn++;
+            if(state.extraTurns > 0) { 
+                state.extraTurns--; 
+                printLog("✨ ターン終了：追加ターンを消費して開始します！");
+            } else {
+                state.turn++;
+                printLog(`➔ ターン終了。ターン ${state.turn} を開始します。`);
+            }
             state.hasChargedMana = false;
             drawCard();
             render();
@@ -208,7 +237,7 @@
             if (from === to) return;
             if (from === 'hand' && to === 'mana') { 
                 if (state.hasChargedMana) { 
-                    alert("マナチャージは1ターンに1回までだじょ！"); 
+                    printLog("マナチャージは1ターンに1回までだじょ！", true); 
                     return; 
                 } 
                 state.hasChargedMana = true; 
@@ -220,11 +249,13 @@
                 if (to === 'mana' && c.multi) c.tapped = true; else if (to !== 'battle') c.tapped = false;
                 state[to].push(c);
                 
-                // 直接墓地にドラッグされた場合は効果を発動するトリガーにする
+                // 直接墓地にドラッグされた場合、または手札から直接唱えられた時
                 if (from === 'hand' && to === 'graveyard') {
                     resolveCardEffect(c, 'hand');
-                } else if (to === 'battle' && c.id === 'gospel') {
-                    executeGospel();
+                } 
+                // 【重要】バトルゾーンに移動したときの自動トリガー
+                else if (to === 'battle') {
+                    resolveBattleOnPlayEffect(c);
                 }
                 render();
             }
@@ -270,7 +301,8 @@
                         let c = state[fromZone].find(x => x.uid === uid);
                         if (c) { c.tapped = !c.tapped; render(); }
                     } else if (fromZone === 'shield') {
-                        if (confirm("このシールドを手札に加えますか？")) moveCard(uid, fromZone, 'hand');
+                        moveCard(uid, fromZone, 'hand');
+                        printLog("シールドを手札に加えました。");
                     } else if (fromZone === 'hand') {
                         openModal(uid, fromZone);
                     }
@@ -302,7 +334,7 @@
             });
         });
 
-        // 効果選択用ウィンドウの展開
+        // 効果選択用ウィンドウ
         function openModal(uid, zone) {
             let c = state[zone].find(x => x.uid === uid);
             if(!c || c.facedown) return;
@@ -316,9 +348,14 @@
             const acts = document.getElementById('modal-actions'); acts.innerHTML = '';
             
             if (c.isSpell || c.id === 'love') {
-                createBtn(acts, "✨ 唱える（効果を自動処理して墓地へ）", () => {
+                createBtn(acts, "✨ 呪文側を唱える（効果処理して墓地へ）", () => {
                     moveCard(c.uid, zone, 'graveyard');
                 });
+                if (c.id === 'love' || c.id === 'ttt') {
+                    createBtn(acts, "⚔️ クリーチャー側でバトルゾーンに出す", () => {
+                        moveCard(c.uid, zone, 'battle');
+                    });
+                }
             } else {
                 createBtn(acts, "⚔️ バトルゾーンに出す", () => {
                     moveCard(c.uid, zone, 'battle');
@@ -339,37 +376,52 @@
             document.getElementById('overlay').style.display = 'none'; 
         }
 
-        // --- 🔮 カード効果の自動処理エンジン 🔮 ---
+        // --- ⚔️ バトルゾーンに出たときの自動処理エンジン ⚔️ ---
+        function resolveBattleOnPlayEffect(card) {
+            setTimeout(() => {
+                printLog(`バトルゾーンに ${card.name} が出ました！`);
+                switch (card.id) {
+                    case "gospel":
+                        // ゴスペル登場時：墓地の呪文回収モーダルをブラウザ警告なしで展開
+                        executeGospelModal();
+                        break;
+                    case "ttt":
+                        printLog("T・T・Tが出ました！（ジャストダイバー＆SA付与状態）");
+                        break;
+                    default:
+                        break;
+                }
+            }, 200);
+        }
+
+        // --- 🔮 呪文を唱えたとき（手札➔墓地）の自動処理エンジン 🔮 ---
         function resolveCardEffect(card, fromZone) {
             setTimeout(() => {
                 switch (card.id) {
                     case "ttt":
                     case "love":
-                        // 3ドロー効果
-                        alert(`${card.name} の効果で3枚ドローします！`);
+                        printLog(`${card.name} を唱えました：3枚ドローします。`);
                         drawCard(); drawCard(); drawCard();
                         break;
                     
                     case "lyrmis":
-                        // 追加ターン
                         state.extraTurns++;
-                        alert(`${card.name} 発動！追加ターンを1回獲得しました。`);
+                        printLog(`${card.name} 発動！追加ターンを1回獲得！`);
                         render();
                         break;
 
                     case "coldflame":
                     case "finger":
                     case "roaring":
-                        // 手札を1枚捨てて2枚引く処理
                         if (state.hand.length === 0) {
-                            alert("手札がないため、捨てる処理をスキップして2枚ドローします！");
+                            printLog("手札がないため、捨てる処理をパスして2枚ドローします。");
                             drawCard(); drawCard();
                         } else {
-                            openHandSelectModal("捨てるカードを1枚選んでください（その後2枚引きます）", (selectedUid) => {
+                            openHandSelectModal("手札を1枚選んで捨ててください（その後に2枚引きます）", (selectedUid) => {
                                 let idx = state.hand.findIndex(x => x.uid === selectedUid);
                                 if (idx !== -1) {
                                     state.graveyard.push(state.hand.splice(idx, 1)[0]);
-                                    alert("1枚破棄しました。2枚ドローします。");
+                                    printLog("手札を1枚墓地へ送りました。2枚ドローします。");
                                     drawCard(); drawCard();
                                     render();
                                 }
@@ -378,16 +430,15 @@
                         break;
 
                     case "gate":
-                        // ロスト・ウォーターゲイト：山札からサーチしてトップに置く
                         if (state.deck.length === 0) {
-                            alert("山札がありません！");
+                            printLog("山札がありません！", true);
                         } else {
-                            openDeckSelectModal("山札から1枚選び、山札の一番上に置きます", (selectedUid) => {
+                            openDeckSelectModal("山札から好きなカードを1枚選び、山札の一番上に固定します", (selectedUid) => {
                                 let idx = state.deck.findIndex(x => x.uid === selectedUid);
                                 if (idx !== -1) {
                                     let chosen = state.deck.splice(idx, 1)[0];
-                                    state.deck.push(chosen); // 配列の末尾＝山札の一番上
-                                    alert(`${chosen.name} を山札の一番上に固定しました！`);
+                                    state.deck.push(chosen); // 末尾＝山札トップ
+                                    printLog(`${chosen.name} を山札の一番上に固定しました！`);
                                     render();
                                 }
                             });
@@ -395,9 +446,8 @@
                         break;
 
                     case "concerto":
-                        // セイレーン・コンチェルト：マナ回収＆手札からマナ置き
                         if (state.mana.length === 0) {
-                            alert("マナゾーンにカードがないため、手札から1枚マナに置く処理のみ行います。");
+                            printLog("マナがないため、手札から1枚マナに置く処理のみ行います。");
                             if (state.hand.length > 0) {
                                 openHandSelectModal("マナに置くカードを選んでください", (selectedUid) => {
                                     let idx = state.hand.findIndex(x => x.uid === selectedUid);
@@ -415,6 +465,7 @@
                                     let recovered = state.mana.splice(mIdx, 1)[0];
                                     recovered.tapped = false;
                                     state.hand.push(recovered);
+                                    printLog("選んだマナを手札に戻しました。");
                                     render();
 
                                     setTimeout(() => {
@@ -424,6 +475,7 @@
                                                 let toMana = state.hand.splice(hIdx, 1)[0];
                                                 if (toMana.multi) toMana.tapped = true;
                                                 state.mana.push(toMana);
+                                                printLog("手札から1枚マナチャージしました。");
                                                 render();
                                             }
                                         });
@@ -434,8 +486,7 @@
                         break;
 
                     case "maniacs":
-                        // バッドドッグ・マニアクス：自分のクリーチャー1体自壊＆3枚墓地肥やし
-                        alert("バッドドッグ・マニアクス発動！山札の上から3枚を墓地に置きます。");
+                        printLog("バッドドッグ・マニアクス：山札の上から3枚を墓地に置きました。");
                         for (let i = 0; i < 3; i++) {
                             if (state.deck.length > 0) state.graveyard.push(state.deck.pop());
                         }
@@ -445,6 +496,7 @@
                                     let bIdx = state.battle.findIndex(x => x.uid === bUid);
                                     if(bIdx !== -1) {
                                         state.graveyard.push(state.battle.splice(bIdx, 1)[0]);
+                                        printLog("クリーチャーを1体破壊しました。");
                                         render();
                                     }
                                 });
@@ -453,31 +505,17 @@
                         render();
                         break;
 
-                    case "kirimomi":
-                        alert("キリモミ・ヤマアラシ発動！このターン次に出すクリーチャーにSAを付与します。");
-                        break;
-
                     default:
-                        // 特殊効果がない呪文は唱えた通知のみ
                         break;
                 }
             }, 200);
         }
 
-        // --- 選択用特殊UIモーダル群 ---
-        function openHandSelectModal(title, callback) {
-            setupActionGrid(title, state.hand, callback);
-        }
-        function openManaSelectModal(title, callback) {
-            setupActionGrid(title, state.mana, callback);
-        }
-        function openBattleSelectModal(title, callback) {
-            setupActionGrid(title, state.battle, callback);
-        }
-        function openDeckSelectModal(title, callback) {
-            // 山札は中身がわかるようにソート等せずそのまま表示
-            setupActionGrid(title, [...state.deck].reverse(), callback); // トップに近い方から見せる
-        }
+        // --- 選択用モーダル設定群 ---
+        function openHandSelectModal(title, callback) { setupActionGrid(title, state.hand, callback); }
+        function openManaSelectModal(title, callback) { setupActionGrid(title, state.mana, callback); }
+        function openBattleSelectModal(title, callback) { setupActionGrid(title, state.battle, callback); }
+        function openDeckSelectModal(title, callback) { setupActionGrid(title, [...state.deck].reverse(), callback); }
 
         function setupActionGrid(title, cardArray, callback) {
             document.getElementById('action-modal-title').innerText = title;
@@ -498,14 +536,43 @@
             document.getElementById('overlay').style.display = 'block';
         }
 
-        function executeGospel() { 
-            setTimeout(() => { 
-                if(confirm("ゴスペル能力：墓地の呪文をすべて手札に回収しますか？")){ 
-                    let spells = state.graveyard.filter(x => x.isSpell); 
-                    state.graveyard = state.graveyard.filter(x => !x.isSpell); 
-                    state.hand.push(...spells); render(); 
-                } 
-            }, 300); 
+        // ゴスペル着地時の墓地回収モーダル（ブラウザのアラートを完全排除）
+        function executeGospelModal() {
+            let spells = state.graveyard.filter(x => x.isSpell);
+            if (spells.length === 0) {
+                printLog("墓地に呪文がないため、ゴスペルの回収効果をスキップします。");
+                return;
+            }
+
+            document.getElementById('action-modal-title').innerText = "水晶の王 ゴスペル 効果：墓地の呪文をすべて手札に回収しますか？";
+            const grid = document.getElementById('action-modal-grid');
+            grid.innerHTML = '';
+
+            let btnYes = document.createElement('button');
+            btnYes.className = 'action-yes';
+            btnYes.innerText = `⭕ はい (${spells.length}枚すべて回収)`;
+            btnYes.onclick = () => {
+                let spellsToRecover = state.graveyard.filter(x => x.isSpell); 
+                state.graveyard = state.graveyard.filter(x => !x.isSpell); 
+                state.hand.push(...spellsToRecover);
+                printLog(`ゴスペルの効果で墓地から呪文を ${spellsToRecover.length} 枚回収しました！`);
+                closeModal();
+                render();
+            };
+
+            let btnNo = document.createElement('button');
+            btnNo.className = 'action-no';
+            btnNo.innerText = "❌ いいえ（墓地のままにする）";
+            btnNo.onclick = () => {
+                printLog("ゴスペルの回収効果を使用しませんでした。");
+                closeModal();
+            };
+
+            grid.appendChild(btnYes);
+            grid.appendChild(btnNo);
+
+            document.getElementById('action-modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
         }
 
         function render() {
